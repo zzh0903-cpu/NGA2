@@ -647,9 +647,10 @@ contains
      end do
 
 
-     ! Deallocate memory-intensive arrays that are not used
-     deallocate(this%face_flux)
-
+       ! Deallocate memory-intensive arrays that are not used
+     if (allocated(this%face_flux)) then
+        deallocate(this%face_flux)
+     end if
    end subroutine allocate_supplement
    
    

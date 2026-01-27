@@ -2,38 +2,49 @@
 Partition :	8 1 1
 
 # Mesh definition
-Lx :	10
-Ly :	5
-Lz :	0.01953125  !5
+# Lx :	10
+# Ly :	5
+# Lz :	0.01953125  !5
+# nx :	512
+# ny :	256
+# nz :	1           !100
+
+Lx :	1
+Ly :	0.5
+Lz :	0.5 !5
 nx :	512
 ny :	256
-nz :	1           !100
+nz :	1          !100
 
-# EOS parameters: rho(Z)=rho0*rho1/((1-Z)*rho1+Z*rho0)
-rho0 : 1
-rho1 : 1
-rhost: 0.3
-Zst  : 0.5
-
-# Fluid properties
-Dynamic viscosity :	 0.001
-Dynamic diffusivity : 0.002
-
-# Inflow definition
-Z jet : 1
-D jet : 1
-U jet : 1
-Z coflow : 0.2
-D coflow : 3
-U coflow : 0.2
+U jet : 50
+Jet diameter : 2.5e-2
+Jet location : 0.0
 
 # Time integration
-Max timestep size :	1e-2
-Max cfl number :	   0.9
+Max timestep size : 5e-7
+Max cfl number :    0.9
+Max time :     	    1e-3
+Mach number :        0.8
+Gas gamma :          1.47
+Gas constant :        287.0
+Gas viscosity :       1.8e-5
 
+# Stiffened Gas EOS
+Liquid gamma            = 1.19
+Liquid Pref             = 7.028e8
+Liquid viscosity        = 1.0e-3
+Liquid density          = 1000.0
+Surface tension coefficient = 0.078
+
+Stagnation pressure :	   307e3
+Stagnation temperature : 300
 # Pressure solver
 Pressure tolerance : 	1e-6
 Pressure iteration : 	100
 
+# Implicit velocity solver
+Implicit tolerance : 1e-6
+Implicit iteration : 100
+
 # Ensight output
-Ensight output period : 1e-1
+Ensight output period : 1.99999e-6

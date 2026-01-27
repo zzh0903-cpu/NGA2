@@ -109,7 +109,7 @@ contains
 			real(WP) :: vol,area
 			integer, parameter :: amr_ref_lvl=4
          ! Create a VOF solver
-         vf=vfs(cfg=cfg,reconstruction_method=lvira,name='VOF')
+         call vf%initialize(cfg=cfg,reconstruction_method=lvira,name='VOF')
          ! Set liquid in the inlet
          do k=vf%cfg%kmino_,vf%cfg%kmaxo_
             do j=vf%cfg%jmino_,vf%cfg%jmaxo_
