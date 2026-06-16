@@ -1,0 +1,130 @@
+# # Parallelization
+# Partition :	8 1 1
+
+# # Mesh definition
+# # Domain: ~10D x 5D (D=0.6mm nozzle), near-field quick-look
+# Lx :	0.06
+# Ly :	0.03
+# Lz :	0.03
+# nx :	512
+# ny :	256
+# nz :	1
+
+# U jet : 0.37          ! m/s, quick-look test (Mach~0.20); original=0.37
+# Jet diameter : 6.0e-4   ! 0.6 mm, experiment nozzle inner diameter
+# Jet location : 0.0
+
+# # Time integration
+# Max timestep size : 4e-8   ! acoustic CFL: 0.3*dx/c_N2 = 0.3*93.75e-6/489
+# Max cfl number :    0.3
+# Max time :          5e-3  ! ~670 steps at dt=6e-8
+
+# Surface tension coefficient : 0.0
+# Species diffusivity : 1.0e-5 ! m^2/s, molecular diffusivity estimate
+
+# # N2 ideal gas EOS (ambient, "gas" phase) - at 10 MPa, 575 K
+# N2 gamma     = 1.4
+# N2 Pref      = 0.0
+# N2 q         = 0.0
+# N2 b         = 0.0
+# N2 viscosity = 2.9e-5   ! Pa.s at 575 K (Sutherland estimate)
+# N2 constant  = 296.8    ! J/(kg.K), R = R_univ/M_N2
+# N2 Prandtl   = 0.72
+
+# # n-C7H16 ideal gas EOS (jet, "liquid" phase) - Fig.8(b): 10 MPa, 538 K supercritical
+# # R = 8314/100.2 = 82.97 J/(kg.K), rho = P/(RT) = 224 kg/m^3
+# # gamma~1.05 from cp~2400 J/(kg.K) for n-heptane vapor at 540 K
+# Heptane gamma     = 1.05
+# Heptane Pref      = 0.0
+# Heptane q         = 0.0
+# Heptane b         = 0.0
+# Heptane viscosity = 7.6e-5  ! Pa.s, back-calculated from Re=650: mu=rho*U*D/Re
+# Heptane constant  = 82.97   ! J/(kg.K), R = R_univ/M_C7H16 (M=100.2 g/mol)
+# Heptane Prandtl   = 0.85    ! estimate for supercritical n-heptane vapor
+
+# Static pressure     = 1.0e7    ! 10 MPa, Fig. 8(b)
+# Static temperature  = 575      ! fallback
+# Coflow temperature  = 575      ! K, N2 ambient, Fig. 8(b) chamber temperature
+# Jet temperature     = 538      ! K, supercritical n-heptane, Fig. 8(b)
+# Coflow velocity     = 0.02     ! m/s, quiescent ambient (no co-flow in experiment)
+
+# # Pressure solver
+# Pressure tolerance : 	1e-6
+# Pressure iteration : 	100
+
+# # Implicit velocity solver
+# Implicit tolerance : 1e-6
+# Implicit iteration : 100
+
+# # Ensight output
+# Ensight output period : 2e-5   ! every ~10 steps -> ~65 frames in 670 steps
+# Parallelization
+Partition :	1 1 1
+
+# Mesh definition
+# Near-field version for the present low-speed case:
+#   Lx = 13.3D, Ly = 10D, with ~19.2 cells across D = 0.6 mm
+Lx :	0.008
+Ly :	0.006
+Lz :	0.006
+nx :	512
+ny :	386
+nz :	1
+
+U jet : 0.178         ! m/s, current low-speed quick-look case
+Jet diameter : 6.0e-4 ! 0.6 mm, experiment nozzle inner diameter
+Jet location : 0.0
+Initial jet offset : 1.3e-3
+# Initial jet length : 1.2e-3   ! removed: domain now initialized to uniform Ucof
+# Initial jet taper : 3.0e-4    ! removed: no stub window needed
+# Time integration
+# dx = dy = 31.25 um, so dt=1.5e-8 keeps the acoustic CFL below 0.3。 3.2e-8 0.3
+Max timestep size : 999
+Max cfl number :    0.2
+Max time :          1e-1
+
+Surface tension coefficient : 0.0
+Species diffusivity : 1.0e-5 ! m^2/s, molecular diffusivity estimate
+
+# N2 ideal gas EOS (ambient, "gas" phase) - at 10 MPa, 575 K
+N2 gamma     = 1.4
+N2 Pref      = 0.0
+N2 q         = 0.0
+N2 b         = 0.0
+N2 viscosity = 2.9e-5
+N2 constant  = 296.8
+N2 Prandtl   = 0.72
+
+# n-C7H16 ideal gas EOS (jet, "liquid" phase) - Fig.8(b): 10 MPa, 538 K supercritical
+# Heptane gamma     = 1.05
+# Heptane Pref      = 0.0
+# Heptane q         = 0.0
+# Heptane b         = 0.0
+# Heptane viscosity = 7.6e-5
+# Heptane constant  = 82.97
+# Heptane Prandtl   = 0.85
+Heptane gamma     = 1.4
+Heptane Pref      = 0.0
+Heptane q         = 0.0
+Heptane b         = 0.0
+Heptane viscosity = 2.9e-5
+Heptane constant  = 296.8
+Heptane Prandtl   = 0.72
+
+Static pressure     = 1.0e7
+Static temperature  = 575
+Coflow temperature  = 575
+# Jet temperature     = 538
+Jet temperature     = 575
+Coflow velocity     = 0.02
+
+# Pressure solver
+Pressure tolerance : 	1e-6
+Pressure iteration : 	100
+
+# Implicit velocity solver
+Implicit tolerance : 1e-6
+Implicit iteration : 100
+
+# Ensight output
+Ensight output period : 1e-5

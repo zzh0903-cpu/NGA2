@@ -1,0 +1,3 @@
+This is a variable density jet.
+The variable-temperature version now reconstructs the local mixture temperature from the current mixture state instead of forcing `T = const`, uses nonzero thermal conductivity from the species viscosity and Prandtl-number inputs, and feeds `Temperature`, `kappa_mix`, and `rhoCv_mix` into the diffusion step.
+`input_variableT` provides an example with different jet/coflow inlet temperatures.

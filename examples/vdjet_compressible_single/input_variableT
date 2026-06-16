@@ -1,0 +1,57 @@
+# Parallelization
+Partition :	8 1 1
+
+# Mesh definition
+Lx :	1
+Ly :	0.5
+Lz :	0.5
+nx :	512
+ny :	256
+nz :	1
+
+U jet : 200
+Jet diameter : 2.5e-2
+Jet location : 0.0
+
+# Time integration
+Max timestep size : 5e-7
+Max cfl number :    0.3
+Max time :     	    1e-2
+
+Surface tension coefficient : 0.0
+Species diffusivity : 1.0e-3 ! m^2/s, effective turbulent diffusivity for visible mixing
+
+# N2 ideal gas EOS (coflow, "gas" phase)
+N2 gamma     = 1.4
+N2 Pref      = 0.0
+N2 q         = 0.0
+N2 b         = 0.0
+N2 viscosity = 1.77e-5
+N2 constant  = 296.8
+N2 Prandtl   = 0.72
+
+# CH4 ideal gas EOS (jet, "liquid" phase)
+CH4 gamma     = 1.32
+CH4 Pref      = 0.0
+CH4 q         = 0.0
+CH4 b         = 0.0
+CH4 viscosity = 1.1e-5
+CH4 constant  = 518.3
+CH4 Prandtl   = 0.72
+
+Static pressure     = 1.0e7    ! 100 bar, Pa
+Static temperature  = 300      ! fallback when inlet temperatures are not specified
+Coflow temperature  = 300      ! K
+Jet temperature     = 450      ! K, example variable-temperature jet
+Coflow velocity     = 20.0
+
+# Pressure solver
+Pressure tolerance : 	1e-6
+Pressure iteration : 	100
+
+# Implicit velocity solver
+Implicit tolerance : 1e-6
+Implicit iteration : 100
+
+# Ensight output
+Ensight output period : 1e-4
