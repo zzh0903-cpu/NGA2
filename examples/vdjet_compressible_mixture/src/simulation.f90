@@ -1,4 +1,4 @@
-!> Low-Mach variable-density vdjet case with NASG-based properties.
+!> Low-Mach variable-temperature vdjet case with a single-component NASG EOS.
 !> This uses the public src/variable_density lowmach_class/vdscalar_class API.
 module simulation
    use precision,         only: WP
@@ -32,21 +32,17 @@ module simulation
    real(WP), dimension(:,:,:), allocatable :: Ui, Vi, Wi
 
    ! Output/property arrays
-   real(WP), dimension(:,:,:), allocatable :: Xmole_heptane
    real(WP), dimension(:,:,:), allocatable :: mu_mix, cp_mix, cv_mix, gamma_mix
    real(WP), dimension(:,:,:), allocatable :: speed_of_sound, Mach_mix
 
-   ! NASG and transport parameters
-   real(WP) :: MW_heptane, MW_N2
+   ! Single-component NASG and transport parameters
    real(WP) :: P_inf, T_inf, T_cof_inlet, T_jet_inlet
-   real(WP) :: gamm_n2_ref, visc_n2_ref, R_n2_ref, Pref_n2_ref, q_n2_ref, b_n2_ref
-   real(WP) :: gamm_heptane_ref, visc_heptane_ref, R_heptane_ref, Pref_heptane_ref
-   real(WP) :: q_heptane_ref, b_heptane_ref
-   real(WP) :: cv_n2_ref, cv_heptane_ref, Pr_n2_ref, Pr_heptane_ref
+   real(WP) :: gamma_ref, visc_ref, R_ref, Pref_ref, q_ref, b_ref
+   real(WP) :: cv_ref, cp_ref, Pr_ref, kappa_ref
 
    ! Inlet parameters
    real(WP) :: Djet, Ujet, Ucof, xjet
-   real(WP) :: x0_init, inlet_velocity_radius, inlet_ramp_time, D_species
+   real(WP) :: x0_init, inlet_velocity_radius, inlet_ramp_time
 
    ! Integral of pressure residual
    real(WP) :: int_RP=0.0_WP
@@ -77,102 +73,50 @@ contains
       isIn = (i.eq.pg%imax+1)
    end function xp_locator
 
-   function local_temperature(Y_heptane) result(temp)
+   subroutine nasg_properties(pres,temp,rho,mu,cp,cv,gamma,a)
       implicit none
-      real(WP), intent(in) :: Y_heptane
-      real(WP) :: temp, y, cp_n2, cp_h, w_h, w_n2
-      ! Energy-consistent (enthalpy-conserving) mixing temperature for
-      ! adiabatic, constant-pressure mixing of two non-reacting streams.
-      ! NASG enthalpy h = cp*T + b*P + q has b*P and q linear in Y on both
-      ! sides, so they cancel and the mixing temperature is cp-weighted:
-      !   T = (Y*cp_h*T_jet + (1-Y)*cp_n2*T_cof)/(Y*cp_h + (1-Y)*cp_n2)
-      y     = max(0.0_WP,min(1.0_WP,Y_heptane))
-      cp_n2 = cv_n2_ref      + R_n2_ref
-      cp_h  = cv_heptane_ref + R_heptane_ref
-      w_h   = y*cp_h
-      w_n2  = (1.0_WP-y)*cp_n2
-      temp  = (w_h*T_jet_inlet + w_n2*T_cof_inlet)/max(w_h+w_n2,1.0e-20_WP)
-   end function local_temperature
-
-   subroutine strict_mixture_terms(Y_heptane,pres,A,B,Rm,cvm,gammam,Prefm,qm,bm,mum,cpm)
-      implicit none
-      real(WP), intent(in)  :: Y_heptane, pres
-      real(WP), intent(out) :: A, B, Rm, cvm, gammam, Prefm, qm, bm, mum, cpm
-      real(WP) :: y, yn2, den_n2, den_heptane
-
-      y   = max(0.0_WP,min(1.0_WP,Y_heptane))
-      yn2 = 1.0_WP-y
-
-      den_n2      = max(pres+Pref_n2_ref,      1.0e-20_WP)
-      den_heptane = max(pres+Pref_heptane_ref, 1.0e-20_WP)
-
-      ! Specific volume for a mixture at fixed pressure and temperature:
-      ! v = sum_k Y_k * (R_k*T/(P+Pinf_k) + b_k)
-      A = yn2*R_n2_ref/den_n2 + y*R_heptane_ref/den_heptane
-      B = yn2*b_n2_ref        + y*b_heptane_ref
-
-      Rm     = yn2*R_n2_ref       + y*R_heptane_ref
-      cvm    = yn2*cv_n2_ref      + y*cv_heptane_ref
-      cpm    = cvm + Rm
-      gammam = cpm/max(cvm,1.0e-20_WP)
-      Prefm  = yn2*Pref_n2_ref    + y*Pref_heptane_ref
-      qm     = yn2*q_n2_ref       + y*q_heptane_ref
-      bm     = B
-      mum    = yn2*visc_n2_ref    + y*visc_heptane_ref
-   end subroutine strict_mixture_terms
-
-   subroutine nasg_properties(pres,temp,Y_heptane,rho,mu,cp,cv,gamma,a)
-      implicit none
-      real(WP), intent(in)  :: pres, temp, Y_heptane
+      real(WP), intent(in)  :: pres, temp
       real(WP), intent(out) :: rho, mu, cp, cv, gamma, a
-      real(WP) :: Av, Bv, Rm, Prefm, qm, bm, bulkmod, v
+      real(WP) :: peff, tcell, bulkmod
 
-      call strict_mixture_terms(Y_heptane,pres,Av,Bv,Rm,cv,gamma,Prefm,qm,bm,mu,cp)
-      v       = Bv + max(temp,1.0e-6_WP)*Av
-      rho     = 1.0_WP/max(v,1.0e-20_WP)
-      bulkmod = gamma*max(pres+Prefm,1.0e-20_WP)/max(1.0_WP-rho*bm,1.0e-20_WP)
+      peff    = max(pres+Pref_ref,1.0e-20_WP)
+      tcell   = max(temp,1.0e-6_WP)
+      rho     = 1.0_WP/max(b_ref+R_ref*tcell/peff,1.0e-20_WP)
+      mu      = visc_ref
+      cp      = cp_ref
+      cv      = cv_ref
+      gamma   = gamma_ref
+      bulkmod = gamma*peff/max(1.0_WP-rho*b_ref,1.0e-20_WP)
       a       = sqrt(max(bulkmod/max(rho,1.0e-20_WP),0.0_WP))
    end subroutine nasg_properties
 
-   function nasg_density(pres,temp,Y_heptane) result(rho)
+   function nasg_density(pres,temp) result(rho)
       implicit none
-      real(WP), intent(in) :: pres, temp, Y_heptane
+      real(WP), intent(in) :: pres, temp
       real(WP) :: rho, mu, cp, cv, gamma, a
-      call nasg_properties(pres,temp,Y_heptane,rho,mu,cp,cv,gamma,a)
+      call nasg_properties(pres,temp,rho,mu,cp,cv,gamma,a)
    end function nasg_density
 
-   function heptane_mass_to_mole_frac(Y_heptane) result(X)
-      implicit none
-      real(WP), intent(in) :: Y_heptane
-      real(WP) :: X, y, n_h, n_n2
-      y    = max(0.0_WP,min(1.0_WP,Y_heptane))
-      n_h  = y/max(MW_heptane,1.0e-20_WP)
-      n_n2 = (1.0_WP-y)/max(MW_N2,1.0e-20_WP)
-      X    = n_h/max(n_h+n_n2,1.0e-20_WP)
-   end function heptane_mass_to_mole_frac
-
-   ! Update density, viscosity, and diagnostic NASG properties from sc%SC.
+   ! Update density, viscosity, and diagnostic NASG properties from temperature.
    subroutine update_properties()
       implicit none
       integer :: i,j,k
-      real(WP) :: y, temp, rho, mu, cp, cv, gamma, a
+      real(WP) :: temp, rho, mu, cp, cv, gamma, a
 
       do k=sc%cfg%kmino_,sc%cfg%kmaxo_
          do j=sc%cfg%jmino_,sc%cfg%jmaxo_
             do i=sc%cfg%imino_,sc%cfg%imaxo_
-               y    = max(0.0_WP,min(1.0_WP,sc%SC(i,j,k)))
-               temp = local_temperature(y)
-               call nasg_properties(P_inf,temp,y,rho,mu,cp,cv,gamma,a)
+               temp = max(sc%SC(i,j,k),1.0e-6_WP)
+               call nasg_properties(P_inf,temp,rho,mu,cp,cv,gamma,a)
 
                sc%rho(i,j,k)          = rho
-               sc%diff(i,j,k)         = rho*D_species
+               sc%diff(i,j,k)         = kappa_ref/max(cp_ref,1.0e-20_WP)
                fs%visc(i,j,k)         = mu
                mu_mix(i,j,k)          = mu
                cp_mix(i,j,k)          = cp
                cv_mix(i,j,k)          = cv
                gamma_mix(i,j,k)       = gamma
                speed_of_sound(i,j,k)  = a
-               Xmole_heptane(i,j,k)   = heptane_mass_to_mole_frac(y)
             end do
          end do
       end do
@@ -185,7 +129,6 @@ contains
       call fs%cfg%sync(cv_mix)
       call fs%cfg%sync(gamma_mix)
       call fs%cfg%sync(speed_of_sound)
-      call fs%cfg%sync(Xmole_heptane)
    end subroutine update_properties
 
    subroutine update_mach()
@@ -211,8 +154,8 @@ contains
       real(WP) :: rho_ref, nu_ref, Uexcess, Mref, xeff
       real(WP) :: arg, arg_edge, amplitude, sech2, sech2_edge, denom, radius
 
-      rho_ref = nasg_density(P_inf,T_cof_inlet,0.0_WP)
-      nu_ref  = visc_n2_ref/max(rho_ref,1.0e-20_WP)
+      rho_ref = nasg_density(P_inf,T_cof_inlet)
+      nu_ref  = visc_ref/max(rho_ref,1.0e-20_WP)
       Uexcess = max(abs(Ujet-Ucof),1.0e-20_WP)
       Mref    = rho_ref*Uexcess*Uexcess*Djet
       xeff    = max(xloc+x0_init,x0_init)
@@ -233,20 +176,17 @@ contains
       blend      = max(0.0_WP,min(1.0_WP,blend))
    end function plane_jet_blend
 
-   subroutine get_inlet_profile(j,k,Y_heptane,uvel)
+   subroutine get_inlet_profile(j,k,Tcell,uvel)
       implicit none
       integer, intent(in) :: j,k
-      real(WP), intent(out) :: Y_heptane, uvel
+      real(WP), intent(out) :: Tcell, uvel
       real(WP) :: r_dist, blend, ramp
 
       r_dist    = sqrt(fs%cfg%ym(j)**2+fs%cfg%zm(k)**2)
-      ! Smooth Tollmien (sech^2) profile applied CONSISTENTLY to both velocity
-      ! and species/density. Only the velocity excess is ramped, so the coflow
-      ! remains present from t=0 while the jet starts smoothly.
       blend     = plane_jet_blend(0.0_WP,r_dist)
       ramp      = min(1.0_WP,time%t/max(inlet_ramp_time,1.0e-20_WP))
       uvel      = Ucof + ramp*(Ujet-Ucof)*blend
-      Y_heptane = blend
+      Tcell     = T_cof_inlet + (T_jet_inlet-T_cof_inlet)*blend
    end subroutine get_inlet_profile
 
    subroutine enforce_scalar_inlet()
@@ -254,13 +194,13 @@ contains
       implicit none
       type(bcond), pointer :: mybc
       integer :: n,i,j,k
-      real(WP) :: Y_h, udum
+      real(WP) :: Tcell, udum
 
       call sc%get_bcond('inflow',mybc)
       do n=1,mybc%itr%no_
          i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-         call get_inlet_profile(j,k,Y_h,udum)
-         sc%SC(i,j,k) = Y_h
+         call get_inlet_profile(j,k,Tcell,udum)
+         sc%SC(i,j,k) = Tcell
       end do
    end subroutine enforce_scalar_inlet
 
@@ -269,12 +209,12 @@ contains
       implicit none
       type(bcond), pointer :: mybc
       integer :: n,i,j,k
-      real(WP) :: Y_h, uvel
+      real(WP) :: Tcell, uvel
 
       call fs%get_bcond('inflow',mybc)
       do n=1,mybc%itr%no_
          i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-         call get_inlet_profile(j,k,Y_h,uvel)
+         call get_inlet_profile(j,k,Tcell,uvel)
          fs%U(i,j,k)    = uvel
          fs%rhoU(i,j,k) = uvel*sum(fs%itpr_x(:,i,j,k)*fs%rho(i-1:i,j,k))
       end do
@@ -285,26 +225,17 @@ contains
       implicit none
 
       read_params: block
-         call param_read('N2 gamma',     gamm_n2_ref)
-         call param_read('N2 Pref',      Pref_n2_ref)
-         call param_read('N2 q',         q_n2_ref)
-         call param_read('N2 b',         b_n2_ref)
-         call param_read('N2 viscosity', visc_n2_ref)
-         call param_read('N2 constant',  R_n2_ref)
-         call param_read('N2 MW',        MW_N2)
-         call param_read('N2 Prandtl',   Pr_n2_ref, default=0.72_WP)
+         call param_read('NASG gamma',     gamma_ref)
+         call param_read('NASG Pref',      Pref_ref)
+         call param_read('NASG q',         q_ref)
+         call param_read('NASG b',         b_ref)
+         call param_read('NASG viscosity', visc_ref)
+         call param_read('NASG constant',  R_ref)
+         call param_read('NASG Prandtl',   Pr_ref, default=0.72_WP)
 
-         call param_read('Heptane gamma',     gamm_heptane_ref)
-         call param_read('Heptane Pref',      Pref_heptane_ref)
-         call param_read('Heptane q',         q_heptane_ref)
-         call param_read('Heptane b',         b_heptane_ref)
-         call param_read('Heptane viscosity', visc_heptane_ref)
-         call param_read('Heptane constant',  R_heptane_ref)
-         call param_read('Heptane MW',        MW_heptane)
-         call param_read('Heptane Prandtl',   Pr_heptane_ref, default=0.72_WP)
-
-         cv_n2_ref      = R_n2_ref/max(gamm_n2_ref-1.0_WP,1.0e-20_WP)
-         cv_heptane_ref = R_heptane_ref/max(gamm_heptane_ref-1.0_WP,1.0e-20_WP)
+         cv_ref    = R_ref/max(gamma_ref-1.0_WP,1.0e-20_WP)
+         cp_ref    = cv_ref + R_ref
+         kappa_ref = visc_ref*cp_ref/max(Pr_ref,1.0e-20_WP)
 
          call param_read('U jet',                 Ujet)
          call param_read('Jet diameter',          Djet)
@@ -317,7 +248,6 @@ contains
          call param_read('Static temperature',    T_inf)
          call param_read('Coflow temperature',    T_cof_inlet, default=T_inf)
          call param_read('Jet temperature',       T_jet_inlet, default=T_inf)
-         call param_read('Species diffusivity',   D_species, default=1.0e-5_WP)
       end block read_params
 
       create_velocity_solver: block
@@ -340,7 +270,7 @@ contains
       create_scalar_solver: block
          use vdscalar_class, only: dirichlet, neumann, quick
 
-         sc=vdscalar(cfg=cfg,scheme=quick,name='MassFrac_heptane')
+         sc=vdscalar(cfg=cfg,scheme=quick,name='Temperature')
          call sc%add_bcond(name='inflow' , type=dirichlet, locator=xm_locator_sc)
          call sc%add_bcond(name='outflow', type=neumann,   locator=xp_locator, dir='+x')
          ss = ddadi(cfg=cfg,name='Scalar',nst=13)
@@ -355,7 +285,6 @@ contains
          allocate(Vi  (fs%cfg%imino_:fs%cfg%imaxo_,fs%cfg%jmino_:fs%cfg%jmaxo_,fs%cfg%kmino_:fs%cfg%kmaxo_))
          allocate(Wi  (fs%cfg%imino_:fs%cfg%imaxo_,fs%cfg%jmino_:fs%cfg%jmaxo_,fs%cfg%kmino_:fs%cfg%kmaxo_))
          allocate(resSC(sc%cfg%imino_:sc%cfg%imaxo_,sc%cfg%jmino_:sc%cfg%jmaxo_,sc%cfg%kmino_:sc%cfg%kmaxo_))
-         allocate(Xmole_heptane(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(mu_mix        (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(cp_mix        (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(cv_mix        (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
@@ -374,11 +303,12 @@ contains
       end block initialize_timetracker
 
       initialize_scalar: block
-         sc%SC = 0.0_WP
+         sc%SC = T_cof_inlet
          call enforce_scalar_inlet()
          call sc%apply_bcond(time%t,time%dt)
          call update_properties()
          sc%rhoold = sc%rho
+         sc%SCold = sc%SC
          call sc%rho_multiply()
       end block initialize_scalar
 
@@ -411,8 +341,7 @@ contains
          call ens_out%add_vector('velocity',         Ui,Vi,Wi)
          call ens_out%add_scalar('pressure',         fs%P)
          call ens_out%add_scalar('density',          sc%rho)
-         call ens_out%add_scalar('MassFrac_heptane', sc%SC)
-         call ens_out%add_scalar('MoleFrac_heptane', Xmole_heptane)
+         call ens_out%add_scalar('temperature',      sc%SC)
          call ens_out%add_scalar('viscosity',        mu_mix)
          call ens_out%add_scalar('cp_mix',           cp_mix)
          call ens_out%add_scalar('cv_mix',           cv_mix)
@@ -438,8 +367,8 @@ contains
          call mfile%add_column(fs%Vmax,       'Vmax')
          call mfile%add_column(fs%Wmax,       'Wmax')
          call mfile%add_column(fs%Pmax,       'Pmax')
-         call mfile%add_column(sc%SCmax,      'Ymax')
-         call mfile%add_column(sc%SCmin,      'Ymin')
+         call mfile%add_column(sc%SCmax,      'Tmax')
+         call mfile%add_column(sc%SCmin,      'Tmin')
          call mfile%add_column(sc%rhomax,     'RHOmax')
          call mfile%add_column(sc%rhomin,     'RHOmin')
          call mfile%add_column(int_RP,        'Int(RP)')
@@ -462,9 +391,9 @@ contains
          consfile = monitor(fs%cfg%amRoot,'conservation')
          call consfile%add_column(time%n,        'Step')
          call consfile%add_column(time%t,        'Time')
-         call consfile%add_column(sc%SCint,      'SC_integral')
+         call consfile%add_column(sc%SCint,      'T_integral')
          call consfile%add_column(sc%rhoint,     'RHO_integral')
-         call consfile%add_column(sc%rhoSCint,   'rhoSC_integral')
+         call consfile%add_column(sc%rhoSCint,   'rhoT_integral')
          call consfile%write()
       end block create_monitor
    end subroutine simulation_init
@@ -489,7 +418,7 @@ contains
          fs%rhoWold = fs%rhoW
 
          do while (time%it.le.time%itmax)
-            ! Scalar equation for heptane mass fraction.
+            ! Temperature equation.
             sc%SC = 0.5_WP*(sc%SC+sc%SCold)
             call sc%get_drhoSCdt(resSC,fs%rhoU,fs%rhoV,fs%rhoW)
             resSC = time%dt*resSC - (2.0_WP*sc%rho*sc%SC-(sc%rho+sc%rhoold)*sc%SCold)
@@ -561,7 +490,7 @@ contains
    subroutine simulation_final
       implicit none
       deallocate(resU,resV,resW,resSC,Ui,Vi,Wi)
-      deallocate(Xmole_heptane,mu_mix,cp_mix,cv_mix,gamma_mix,speed_of_sound,Mach_mix)
+      deallocate(mu_mix,cp_mix,cv_mix,gamma_mix,speed_of_sound,Mach_mix)
    end subroutine simulation_final
 
 end module simulation

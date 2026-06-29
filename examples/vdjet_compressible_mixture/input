@@ -1,0 +1,47 @@
+# Parallelization
+Partition :	1 1 1
+
+# Mesh definition
+# Near-field version for the present low-speed case:
+#   Lx = 13.3D, Ly = 10D, with ~19.2 cells across D = 0.6 mm
+Lx :	0.008
+Ly :	0.006
+Lz :	0.006
+nx :	512
+ny :	386
+nz :	1
+
+U jet : 0.178         ! m/s, current low-speed quick-look case
+Jet diameter : 6.0e-4 ! 0.6 mm, experiment nozzle inner diameter
+Jet location : 0.0
+Initial jet offset : 5e-3
+# Initial jet length : 1.2e-3   ! removed: domain now initialized to uniform Ucof
+# Initial jet taper : 3.0e-4    ! removed: no stub window needed
+# Time integration
+# dx = dy = 31.25 um, so dt=1.5e-8 keeps the acoustic CFL below 0.3。 3.2e-8 0.3
+Max timestep size : 1e-5   ! convective CFL: 0.2*dx/U_jet ~ 1.75e-5 (no acoustic constraint)
+Max cfl number :    0.2
+Max time :          1e-1
+
+# Single-component NASG EOS and transport model.
+# The scalar equation advances temperature with k = mu*cp/Pr.
+NASG gamma     = 1.22
+NASG Pref      = 8.6e7
+NASG q         = -1.27e6
+NASG b         = -1.19e-3
+NASG viscosity = 7.6e-5
+NASG constant  = 595.1
+NASG Prandtl   = 0.85
+
+Static pressure     = 1.0e7
+Static temperature  = 575
+Coflow temperature  = 575
+Jet temperature     = 538
+Coflow velocity     = 0.02
+
+# Pressure solver
+Pressure tolerance : 	1e-6
+Pressure iteration : 	200
+
+# Ensight output
+Ensight output period : 1e-3   ! ~100 frames over 0.1s
